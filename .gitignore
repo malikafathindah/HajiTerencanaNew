@@ -14,3 +14,4 @@ sheet1*.xlsx
 sheet2*.xlsx
 sheet1.html
 sheet2.html
+__pycache__/

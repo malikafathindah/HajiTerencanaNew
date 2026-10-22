@@ -389,7 +389,7 @@ body {
 
 .running-text-content {
   display: inline-block;
-  animation: marquee 22s linear infinite;
+  animation: marquee 37s linear infinite;
 }
 
 .running-text-content:hover {
@@ -1324,6 +1324,59 @@ body {
   }
 }
 
+/* PDF Preview Box (Lampiran 3) */
+.preview-pdf-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: var(--radius-md);
+  margin-top: 10px;
+  gap: 6px;
+}
+
+/* Disabled button state */
+.btn-disabled, .btn-action-print:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  background: #64748b !important;
+}
+
+/* Mahram Split Modal Styling */
+.mahram-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.mahram-table th {
+  padding: 10px;
+  border-bottom: 2px solid #e2e8f0;
+  background: #f8fafc;
+  font-weight: 700;
+  color: #334155;
+}
+.mahram-table td {
+  padding: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+.mahram-total-banner {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  color: #0f766e;
+  border-radius: 8px;
+  text-align: center;
+}
+.mahram-total-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+}
   </style>
 </head>
 
@@ -1533,18 +1586,23 @@ body {
             </div>
 
             <div class="form-group">
-              <label class="form-label">Bukti Transfer (Foto/Gambar)</label>
+              <label class="form-label">Bukti Transfer (Foto/Gambar/PDF)</label>
               <div class="upload-area" onclick="document.getElementById('fileUploadInput').click()">
                 <i class="ri-upload-2-line upload-icon"></i>
-                <div class="upload-text" id="uploadAreaText">Klik atau seret foto bukti transfer di sini</div>
-                <div class="upload-subtext">Format: JPG, PNG, JPEG (Maksimal 5 MB)</div>
-                <input type="file" id="fileUploadInput" accept="image/*" style="display:none;">
+                <div class="upload-text" id="uploadAreaText">Klik atau seret foto atau PDF bukti transfer di sini</div>
+                <div class="upload-subtext">Format: JPG, PNG, JPEG, PDF (Maksimal 5 MB)</div>
+                <input type="file" id="fileUploadInput" accept="image/*,application/pdf" style="display:none;">
               </div>
 
-              <!-- Preview foto terpilih -->
+              <!-- Preview berkas terpilih (Foto / PDF) -->
               <div id="previewBox" class="preview-box">
-                <img id="previewImg" src="" alt="Preview Bukti Transfer" class="preview-img">
-                <button type="button" class="btn-remove-preview" onclick="removeSelectedFile()" title="Hapus foto">
+                <img id="previewImg" src="" alt="Preview Bukti Transfer" class="preview-img" style="display:none;">
+                <div id="previewPdf" class="preview-pdf-box" style="display:none;">
+                  <i class="ri-file-pdf-fill" style="font-size:38px; color:#ef4444;"></i>
+                  <div style="font-size:13px; font-weight:600; color:#1e293b;" id="previewPdfName">document.pdf</div>
+                  <div style="font-size:11px; color:#64748b;" id="previewPdfSize">Berkas Dokumen PDF</div>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeSelectedFile()" title="Hapus berkas">
                   <i class="ri-close-line"></i>
                 </button>
               </div>
@@ -1573,6 +1631,21 @@ body {
     </div>
   </div>
 
+  <!-- Modal Konfirmasi Split Mahram (Poin 5) -->
+  <div id="mahramConfirmModal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header modal-header-blue">
+        <span class="modal-title"><i class="ri-split-cells-horizontal"></i> Konfirmasi Split Pembayaran</span>
+        <button type="button" class="btn-close-modal" onclick="closeMahramConfirmModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="mahramConfirmBody" style="padding: 18px 20px;"></div>
+      <div class="modal-footer" style="padding: 12px 18px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; background: #f8fafc; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn-cancel" onclick="closeMahramConfirmModal()" style="padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; cursor: pointer; color: #475569; font-weight: 600; font-size: 13px;">Batal</button>
+        <button type="button" class="btn-submit" onclick="proceedMahramSplitSubmit()" style="padding: 9px 20px; border: none; border-radius: 8px; background: #0f766e; color: white; cursor: pointer; font-weight: 600; font-size: 13px;">Proses / Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Profile Jamaah (Lampiran 1 & 4) -->
   <div id="profileModal" class="modal-overlay">
     <div class="modal-box" style="max-width: 500px;">
@@ -1595,9 +1668,9 @@ body {
     </div>
   </div>
 
-  <!-- Modal Pratinjau Dokumen -->
+  <!-- Modal Pratinjau Dokumen & Cetak Kwitansi Resmi (Lampiran 1) -->
   <div id="docViewerModal" class="modal-overlay">
-    <div class="modal-box" style="max-width: 580px;">
+    <div class="modal-box" style="max-width: 780px;">
       <div class="modal-header modal-header-blue">
         <span class="modal-title" id="docViewerTitle"><i class="ri-file-search-line"></i> Pratinjau Dokumen</span>
         <button type="button" class="btn-close-modal" onclick="closeDocViewerModal()">&times;</button>

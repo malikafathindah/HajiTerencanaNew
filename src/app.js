@@ -585,7 +585,34 @@ function getStatusBadgeClass(status) {
 }
 
 /**
- * Modal Kwitansi & Dokumen (Lampiran 5)
+ * Konversi angka ke terbilang bahasa Indonesia (Lampiran 1)
+ */
+function terbilang(n) {
+  if (isNaN(n) || n === null || n === undefined) return '';
+  n = Math.abs(Math.floor(n));
+  if (n === 0) return 'Nol Rupiah';
+
+  const angka = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+
+  function convert(num) {
+    if (num < 12) return angka[num];
+    if (num < 20) return convert(num - 10) + ' Belas';
+    if (num < 100) return convert(Math.floor(num / 10)) + ' Puluh ' + convert(num % 10);
+    if (num < 200) return 'Seratus ' + convert(num - 100);
+    if (num < 1000) return convert(Math.floor(num / 100)) + ' Ratus ' + convert(num % 100);
+    if (num < 2000) return 'Seribu ' + convert(num - 1000);
+    if (num < 1000000) return convert(Math.floor(num / 1000)) + ' Ribu ' + convert(num % 1000);
+    if (num < 1000000000) return convert(Math.floor(num / 1000000)) + ' Juta ' + convert(num % 1000000);
+    if (num < 1000000000000) return convert(Math.floor(num / 1000000000)) + ' Miliar ' + convert(num % 1000000000);
+    return convert(Math.floor(num / 1000000000000)) + ' Triliun ' + convert(num % 1000000000000);
+  }
+
+  return convert(n).replace(/\s+/g, ' ').trim() + ' Rupiah';
+}
+
+/**
+ * Modal Struk Angsuran Haji (Lampiran 2)
+ * Tombol "Lihat Dokumen" dihilangkan, "Cetak Kwitansi" hanya aktif jika Status Approved (Poin 1)
  */
 window.openReceiptModal = function (idx) {
   const item = filteredAngsuranList[idx];
@@ -596,7 +623,8 @@ window.openReceiptModal = function (idx) {
   const body = document.getElementById('modalReceiptBody');
   if (!modal || !body) return;
 
-  const hasDoc = Boolean(item.linkDokumen);
+  const statusLower = String(item.status || '').toLowerCase();
+  const isApproved = statusLower === 'approved' || statusLower === 'sukses' || statusLower === 'berhasil';
 
   body.innerHTML = `
     <div class="receipt-wrapper">
@@ -651,12 +679,13 @@ window.openReceiptModal = function (idx) {
         <span class="receipt-total-val">${formatRupiah(item.jumlah)}</span>
       </div>
 
-      <!-- Dua Tombol Aksi Sesuai Poin 5: Lihat Dokumen & Cetak Kwitansi -->
-      <div class="receipt-dual-actions">
-        <button type="button" class="btn-action-doc" onclick="viewReceiptDoc(${idx})">
-          <i class="ri-file-search-line"></i> Lihat Dokumen
-        </button>
-        <button type="button" class="btn-action-print" onclick="window.print()">
+      <!-- Sesuai Poin 1 & Lampiran 2: 'Lihat Dokumen' Dihilangkan, hanya 'Cetak Kwitansi' (aktif jika Approved) -->
+      <div class="receipt-actions" style="margin-top: 18px;">
+        <button type="button" class="btn-action-print ${!isApproved ? 'btn-disabled' : ''}" 
+                ${!isApproved ? 'disabled' : ''} 
+                onclick="printOfficialKuitansi(${idx})"
+                title="${isApproved ? 'Cetak Kwitansi Resmi' : 'Cetak Kwitansi hanya tersedia apabila status Approved'}"
+                style="width: 100%; justify-content: center; ${!isApproved ? 'opacity: 0.5; cursor: not-allowed; background: #64748b;' : ''}">
           <i class="ri-printer-line"></i> Cetak Kwitansi
         </button>
       </div>
@@ -672,23 +701,326 @@ window.closeReceiptModal = function () {
 };
 
 /**
- * View receipt transfer document
+ * Cetak Kwitansi Resmi sesuai format Lampiran 1
  */
-window.viewReceiptDoc = function (idx) {
-  const item = filteredAngsuranList[idx] || currentReceiptItem;
+window.printOfficialKuitansi = function (idx) {
+  const item = (idx !== undefined && filteredAngsuranList[idx]) ? filteredAngsuranList[idx] : currentReceiptItem;
   if (!item) return;
 
-  if (item.linkDokumen) {
-    viewDocumentViewer('Bukti Transfer - ' + item.noJurnal, item.linkDokumen);
-  } else {
-    // If no direct upload link, check if jamaah has global buktitransfer
-    const jamaahTransfer = currentUser?.detail?.buktitransfer;
-    if (jamaahTransfer) {
-      viewDocumentViewer('Bukti Transfer Setoran (' + item.noJurnal + ')', jamaahTransfer);
-    } else {
-      showToast('Dokumen bukti transfer fisik tersimpan di kantor / bank.', 'info');
-    }
+  const statusLower = String(item.status || '').toLowerCase();
+  const isApproved = statusLower === 'approved' || statusLower === 'sukses' || statusLower === 'berhasil';
+  if (!isApproved) {
+    showToast('Kwitansi hanya dapat dicetak untuk angsuran berstatus Approved.', 'error');
+    return;
   }
+
+  const logoUrl = 'https://lh3.googleusercontent.com/d/1FlWJ7PpzML8SJdEq3BzOtsuWLD3_uZtJ';
+  const cleanNominal = parseInt(String(item.jumlah || '0').replace(/[^0-9]/g, ''), 10) || 0;
+  const terbilangText = terbilang(cleanNominal);
+  const formattedNominal = new Intl.NumberFormat('id-ID').format(cleanNominal) + ',-';
+  const namaJamaah = item.namaNasabah || currentUser?.namaLengkap || 'Nasabah';
+  const fitsNo = item.noJurnal || item.id || '-';
+  const tglFormatted = formatIndonesianDate(item.tanggal);
+  const uraianText = item.uraian || 'Angsuran Haji Terencana';
+
+  const modal = document.getElementById('docViewerModal');
+  const title = document.getElementById('docViewerTitle');
+  const body = document.getElementById('docViewerBody');
+  if (!modal || !body) return;
+
+  if (title) title.innerHTML = '<i class="ri-printer-line"></i> Cetak Kwitansi Resmi';
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+      <meta charset="UTF-8">
+      <title>KUITANSI - ${escapeHtml(fitsNo)}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          padding: 20px;
+          background: #fff;
+          color: #0f172a;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .kuitansi-frame {
+          border: 2px solid #000;
+          padding: 24px 28px 20px 28px;
+          max-width: 820px;
+          margin: 0 auto;
+          background: #fff;
+        }
+        .header-table {
+          width: 100%;
+          border-collapse: collapse;
+          border-bottom: 2px solid #000;
+          padding-bottom: 10px;
+          margin-bottom: 16px;
+        }
+        .header-logo-cell {
+          width: 130px;
+          vertical-align: middle;
+        }
+        .header-logo-cell img {
+          width: 110px;
+          height: auto;
+          display: block;
+        }
+        .header-info-cell {
+          text-align: left;
+          padding-left: 10px;
+          vertical-align: middle;
+        }
+        .company-name {
+          font-size: 19px;
+          font-weight: 800;
+          color: #000;
+          letter-spacing: 0.5px;
+          margin-bottom: 3px;
+        }
+        .company-address {
+          font-size: 11.5px;
+          line-height: 1.45;
+          color: #000;
+          font-weight: 500;
+        }
+        .title-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 14px;
+          margin-bottom: 20px;
+        }
+        .kuitansi-title-text {
+          flex: 1;
+          text-align: center;
+          font-size: 28px;
+          font-weight: 800;
+          color: #1e3a8a;
+          letter-spacing: 6px;
+          text-transform: uppercase;
+        }
+        .fits-no-box {
+          font-size: 14px;
+          font-weight: 700;
+          color: #000;
+          white-space: nowrap;
+        }
+        .fits-no-line {
+          display: inline-block;
+          min-width: 130px;
+          border-bottom: 1.5px solid #000;
+          padding-bottom: 2px;
+          text-align: center;
+        }
+        .form-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 24px;
+        }
+        .form-table td {
+          padding: 8px 4px;
+          vertical-align: top;
+          font-size: 14px;
+        }
+        .field-label {
+          width: 170px;
+          font-weight: 600;
+          color: #000;
+        }
+        .field-colon {
+          width: 20px;
+          font-weight: 700;
+          text-align: center;
+        }
+        .field-value {
+          font-weight: 600;
+          color: #000;
+        }
+        .striped-box {
+          background: #f1f5f9;
+          background-image: repeating-linear-gradient(0deg, #cbd5e1 0px, #cbd5e1 1px, transparent 1px, transparent 4px);
+          border: 1px solid #94a3b8;
+          padding: 8px 14px;
+          border-radius: 4px;
+          font-size: 14px;
+          font-weight: 700;
+          font-style: italic;
+          color: #000;
+          min-height: 38px;
+          display: flex;
+          align-items: center;
+        }
+        .bottom-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: 10px;
+          margin-bottom: 20px;
+        }
+        .nominal-group {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .nominal-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .nominal-label {
+          width: 45px;
+          color: #000;
+        }
+        .nominal-colon {
+          width: 10px;
+          text-align: center;
+        }
+        .nominal-box {
+          background: #f1f5f9;
+          background-image: repeating-linear-gradient(0deg, #cbd5e1 0px, #cbd5e1 1px, transparent 1px, transparent 4px);
+          border: 1px solid #94a3b8;
+          padding: 6px 18px;
+          border-radius: 4px;
+          font-size: 16px;
+          font-weight: 800;
+          min-width: 180px;
+          text-align: left;
+          color: #000;
+        }
+        .signature-area {
+          text-align: center;
+          min-width: 260px;
+        }
+        .date-location {
+          font-size: 13px;
+          font-weight: 600;
+          color: #000;
+          margin-bottom: 55px;
+        }
+        .company-sig-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #000;
+        }
+        .footer-note-box {
+          border-top: 1px solid #000;
+          padding-top: 8px;
+          margin-top: 14px;
+          font-size: 11px;
+          color: #000;
+          font-style: italic;
+        }
+        @media print {
+          body { padding: 0; background: #fff; }
+          .no-print { display: none !important; }
+          .kuitansi-frame { border: 2px solid #000; margin: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="kuitansi-frame">
+        <table class="header-table">
+          <tr>
+            <td class="header-logo-cell">
+              <img src="${logoUrl}" alt="Fath Indah" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1FlWJ7PpzML8SJdEq3BzOtsuWLD3_uZtJ';">
+            </td>
+            <td class="header-info-cell">
+              <div class="company-name">PT. FATH INDAH TRAVEL SERVICE</div>
+              <div class="company-address">
+                Graha Persada 2, Lt. 5, Jl. KH. Noer Ali No. 89A, Kayuringin Jaya<br>
+                Kec. Bekasi Selatan, Kota Bekasi, Jawa Barat, 17144<br>
+                Phone : 0811-1075-404 Email : info@fathindah.id
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <div class="title-row">
+          <div class="kuitansi-title-text">KUITANSI</div>
+          <div class="fits-no-box">
+            FITS No : <span class="fits-no-line">${escapeHtml(fitsNo)}</span>
+          </div>
+        </div>
+
+        <table class="form-table">
+          <tr>
+            <td class="field-label">Telah terima dari</td>
+            <td class="field-colon">:</td>
+            <td class="field-value">${escapeHtml(namaJamaah)}</td>
+          </tr>
+          <tr>
+            <td class="field-label">Uang Sejumlah</td>
+            <td class="field-colon">:</td>
+            <td class="field-value">
+              <div class="striped-box">${escapeHtml(terbilangText)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="field-label">Untuk Pembayaran</td>
+            <td class="field-colon">:</td>
+            <td class="field-value">${escapeHtml(uraianText)}</td>
+          </tr>
+        </table>
+
+        <div class="bottom-section">
+          <div class="nominal-group">
+            <div class="nominal-row">
+              <span class="nominal-label">Rp.</span>
+              <span class="nominal-colon">:</span>
+              <div class="nominal-box">${formattedNominal}</div>
+            </div>
+            <div class="nominal-row">
+              <span class="nominal-label">USD</span>
+              <span class="nominal-colon">:</span>
+              <div class="nominal-box">-</div>
+            </div>
+          </div>
+
+          <div class="signature-area">
+            <div class="date-location">Bekasi, ${escapeHtml(tglFormatted)}</div>
+            <div class="company-sig-name">PT. Fath Indah Travel Service</div>
+          </div>
+        </div>
+
+        <div class="footer-note-box">
+          Catatan: Kuitansi ini diterbitkan secara elektronik sebagai bukti penerimaan pembayaran dan tidak memerlukan tanda tangan basah.
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;" class="no-print">
+        <button onclick="window.print()" style="padding: 10px 24px; background: #0f766e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+          <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v4h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm0-2v-3h12v3h2v-8H4v8h2zm2-12v2h8V5H8zm0 12v3h8v-3H8z"/></svg>
+          Cetak / Simpan PDF
+        </button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  body.innerHTML = `
+    <div style="height: 75vh; overflow: hidden; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1;">
+      <iframe id="printKuitansiIframe" style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  setTimeout(() => {
+    const iframe = document.getElementById('printKuitansiIframe');
+    if (iframe && iframe.contentWindow) {
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+    }
+  }, 100);
 };
 
 /**
@@ -989,7 +1321,7 @@ window.downloadFinanceListCSV = function () {
 };
 
 /**
- * File selection and upload
+ * File selection and upload (Lampiran 3: Foto/Gambar atau PDF)
  */
 function handleFileChange(e) {
   const file = e.target.files[0];
@@ -1001,17 +1333,39 @@ function handleFileChange(e) {
     return;
   }
 
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
   const reader = new FileReader();
   reader.onload = (event) => {
     selectedFileBase64 = event.target.result;
     const previewBox = document.getElementById('previewBox');
     const previewImg = document.getElementById('previewImg');
+    const previewPdf = document.getElementById('previewPdf');
+    const previewPdfName = document.getElementById('previewPdfName');
+    const previewPdfSize = document.getElementById('previewPdfSize');
     const areaText = document.getElementById('uploadAreaText');
-    if (previewBox && previewImg) {
-      previewImg.src = selectedFileBase64;
-      previewBox.style.display = 'block';
+
+    if (previewBox) previewBox.style.display = 'block';
+
+    if (isPdf) {
+      if (previewImg) previewImg.style.display = 'none';
+      if (previewPdf) {
+        previewPdf.style.display = 'flex';
+        if (previewPdfName) previewPdfName.textContent = file.name;
+        if (previewPdfSize) {
+          const kb = (file.size / 1024).toFixed(1);
+          previewPdfSize.textContent = `Berkas PDF (${kb} KB)`;
+        }
+      }
+      if (areaText) areaText.textContent = `PDF terpilih: ${file.name}`;
+    } else {
+      if (previewPdf) previewPdf.style.display = 'none';
+      if (previewImg) {
+        previewImg.src = selectedFileBase64;
+        previewImg.style.display = 'block';
+      }
+      if (areaText) areaText.textContent = `Foto terpilih: ${file.name}`;
     }
-    if (areaText) areaText.textContent = `Foto terpilih: ${file.name}`;
   };
   reader.readAsDataURL(file);
 }
@@ -1021,29 +1375,133 @@ window.removeSelectedFile = function () {
   const fileInput = document.getElementById('fileUploadInput');
   const previewBox = document.getElementById('previewBox');
   const previewImg = document.getElementById('previewImg');
+  const previewPdf = document.getElementById('previewPdf');
   const areaText = document.getElementById('uploadAreaText');
 
   if (fileInput) fileInput.value = '';
-  if (previewImg) previewImg.src = '';
+  if (previewImg) {
+    previewImg.src = '';
+    previewImg.style.display = 'none';
+  }
+  if (previewPdf) previewPdf.style.display = 'none';
   if (previewBox) previewBox.style.display = 'none';
-  if (areaText) areaText.textContent = 'Klik atau seret foto bukti transfer di sini';
+  if (areaText) areaText.textContent = 'Klik atau seret foto atau PDF bukti transfer di sini';
 };
 
-async function handleUploadSubmit(e) {
-  e.preventDefault();
+/**
+ * Logika Mahram Split (Poin 5)
+ */
+let pendingMahramPayload = null;
 
-  const jumlahRaw = document.getElementById('uploadJumlah').value;
-  const jumlahClean = parseFloat(jumlahRaw.replace(/[^0-9.-]+/g, '')) || 0;
+function showMahramConfirmModal(payload, mahramGroup) {
+  pendingMahramPayload = payload;
+  pendingMahramPayload.mahramGroup = mahramGroup;
+  pendingMahramPayload.selectedIndexes = mahramGroup.map((_, i) => i);
 
-  if (jumlahClean <= 0) {
-    showToast('Nominal setoran harus lebih dari Rp 0!', 'error');
+  renderMahramConfirmBody();
+
+  const modal = document.getElementById('mahramConfirmModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function renderMahramConfirmBody() {
+  const payload = pendingMahramPayload;
+  if (!payload) return;
+
+  const mahramGroup = payload.mahramGroup;
+  const selectedIndexes = payload.selectedIndexes || [];
+  const splitCount = selectedIndexes.length;
+  const splitAmount = splitCount > 0 ? Math.round(payload.totalAmount / splitCount) : 0;
+
+  const container = document.getElementById('mahramConfirmBody');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="mahram-total-banner">
+      <div style="font-size: 13px; margin-bottom: 4px; color: #475569;">Total Jumlah yang Ditransfer</div>
+      <div class="mahram-total-val">Rp ${new Intl.NumberFormat('id-ID').format(payload.totalAmount)}</div>
+    </div>
+    <p style="margin-bottom: 12px; font-size: 13px; color: #475569;">
+      Pilih jamaah untuk alokasi pembayaran. Nominal akan otomatis dibagi rata ke porsi yang dicentang:
+    </p>
+    <div style="max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <table class="mahram-table">
+        <thead>
+          <tr>
+            <th style="width: 45px; text-align: center;">✓</th>
+            <th style="text-align: left;">No BPIH</th>
+            <th style="text-align: left;">Nama Jamaah</th>
+            <th style="text-align: right;">Jumlah Alokasi</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${mahramGroup.map((m, idx) => {
+            const isChecked = selectedIndexes.includes(idx);
+            const rowAmount = isChecked ? splitAmount : 0;
+            return `
+              <tr style="opacity: ${isChecked ? '1' : '0.45'}; background: ${isChecked ? '#fff' : '#f8fafc'};">
+                <td style="text-align: center;">
+                  <input type="checkbox" style="cursor: pointer; width: 16px; height: 16px;" ${isChecked ? 'checked' : ''} onchange="toggleMahramCheckbox(${idx}, this.checked)">
+                </td>
+                <td><strong>${escapeHtml(m.nobpih || '-')}</strong></td>
+                <td>${escapeHtml(m.nama || '-')}</td>
+                <td style="text-align: right; font-weight: 700; color: ${isChecked ? '#0f766e' : '#64748b'};">
+                  Rp ${new Intl.NumberFormat('id-ID').format(rowAmount)}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+window.toggleMahramCheckbox = function (idx, isChecked) {
+  if (!pendingMahramPayload) return;
+  let selected = pendingMahramPayload.selectedIndexes || [];
+
+  if (isChecked) {
+    if (!selected.includes(idx)) selected.push(idx);
+  } else {
+    selected = selected.filter(i => i !== idx);
+  }
+
+  pendingMahramPayload.selectedIndexes = selected;
+  renderMahramConfirmBody();
+};
+
+window.closeMahramConfirmModal = function () {
+  const modal = document.getElementById('mahramConfirmModal');
+  if (modal) modal.style.display = 'none';
+  pendingMahramPayload = null;
+};
+
+window.proceedMahramSplitSubmit = async function () {
+  if (!pendingMahramPayload) return;
+
+  const selected = pendingMahramPayload.selectedIndexes || [];
+  if (selected.length === 0) {
+    showToast('Pilih minimal 1 jamaah untuk alokasi pembayaran!', 'error');
     return;
   }
 
+  const activeMembers = pendingMahramPayload.mahramGroup.filter((_, i) => selected.includes(i));
+  const splitAmount = Math.round(pendingMahramPayload.totalAmount / activeMembers.length);
+  const payloadCopy = { ...pendingMahramPayload };
+
+  closeMahramConfirmModal();
+  await executeFinalSubmission(activeMembers, splitAmount, payloadCopy);
+};
+
+/**
+ * Eksekusi simpan ke tabel entry_angsuran_haji (Mendukung Split Mahram)
+ */
+async function executeFinalSubmission(members, splitAmount, payload) {
   const submitBtn = document.getElementById('btnSubmitUpload');
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span> <span>Mengirim bukti...</span>';
+    submitBtn.innerHTML = '<span class="spinner"></span> <span>Menyimpan bukti...</span>';
   }
 
   const client = getSupabase();
@@ -1059,37 +1517,45 @@ async function handleUploadSubmit(e) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const formattedNow = now.toISOString().replace('T', ' ').substring(0, 19);
-  const random4 = Math.floor(1000 + Math.random() * 9000);
-  const random3 = Math.floor(100 + Math.random() * 900);
 
-  const newId = `AH-${currentYear}-${random4}`;
-  const newJurnal = `JRN-${currentYear}-${random3}`;
+  const records = members.map((m, idx) => {
+    const random4 = Math.floor(1000 + Math.random() * 9000);
+    const random3 = Math.floor(100 + Math.random() * 900);
+    const suffix = members.length > 1 ? `-${idx + 1}` : '';
+    const newId = `AH-${currentYear}-${random4}${suffix}`;
+    const newJurnal = `JRN-${currentYear}-${random3}${suffix}`;
 
-  const record = {
-    timestamp: formattedNow,
-    id_1: newId,
-    nojurnal: newJurnal,
-    idjamaah: currentUser?.idNasabah || `JH-${currentYear}-${random4}`,
-    nobpih: String(currentUser?.noBPIH || '-').replace(/^0+/, ''),
-    namanasabah: currentUser?.namaLengkap || 'Nasabah',
-    bank: document.getElementById('uploadBank').value,
-    uraian: document.getElementById('uploadUraian').value,
-    jumlah: String(jumlahClean),
-    nilaikurs: '0',
-    user_entry: currentUser?.noHP || currentUser?.username || '',
-    tanggal: document.getElementById('uploadTanggal').value || formattedNow.substring(0, 10),
-    metodepembayaran: document.getElementById('uploadMetode').value,
-    status: 'Pending',
-    createdat: formattedNow,
-    typehaji: 'Haji Terencana',
-    nohp: currentUser?.noHP || '',
-    linkdokumen: selectedFileBase64 || ''
-  };
+    let uraianText = payload.uraian || 'Angsuran Haji Terencana';
+    if (members.length > 1) {
+      uraianText += ` (Porsi ${idx + 1}/${members.length})`;
+    }
+
+    return {
+      timestamp: formattedNow,
+      id_1: newId,
+      nojurnal: newJurnal,
+      idjamaah: m.idjamaah || currentUser?.idNasabah || `JH-${currentYear}-${random4}`,
+      nobpih: String(m.nobpih || currentUser?.noBPIH || '-').replace(/^0+/, ''),
+      namanasabah: m.nama || currentUser?.namaLengkap || 'Nasabah',
+      bank: payload.bank,
+      uraian: uraianText,
+      jumlah: String(splitAmount), // Memastikan nominal angka utuh direkam (bukan 7)
+      nilaikurs: '0',
+      user_entry: currentUser?.noHP || currentUser?.username || '',
+      tanggal: payload.tanggal || formattedNow.substring(0, 10),
+      metodepembayaran: payload.metode,
+      status: 'Pending',
+      createdat: formattedNow,
+      typehaji: 'Haji Terencana',
+      nohp: m.nohp || currentUser?.noHP || '',
+      linkdokumen: selectedFileBase64 || ''
+    };
+  });
 
   try {
     const { error } = await client
       .from('entry_angsuran_haji')
-      .insert([record]);
+      .insert(records);
 
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -1099,7 +1565,7 @@ async function handleUploadSubmit(e) {
     if (error) {
       showToast('Gagal menyimpan: ' + error.message, 'error');
     } else {
-      showToast('Bukti angsuran berhasil disimpan dan menunggu verifikasi!', 'success');
+      showToast(`Bukti angsuran berhasil disimpan (${records.length} alokasi) dan menunggu verifikasi!`, 'success');
       document.getElementById('uploadJumlah').value = '';
       removeSelectedFile();
       switchTab('entry');
@@ -1111,6 +1577,112 @@ async function handleUploadSubmit(e) {
       submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
     }
     showToast('Terjadi kesalahan koneksi ke Supabase.', 'error');
+  }
+}
+
+/**
+ * Handle form submit upload setoran (Poin 4 & 5)
+ */
+async function handleUploadSubmit(e) {
+  e.preventDefault();
+
+  const jumlahRaw = document.getElementById('uploadJumlah').value;
+  // Perbaiki bug Lampiran 4: Nominal parsing yang akurat (menghilangkan titik pemisah ribuan)
+  const cleanNumber = String(jumlahRaw).replace(/[^0-9]/g, '');
+  const jumlahClean = parseInt(cleanNumber, 10) || 0;
+
+  if (jumlahClean <= 0) {
+    showToast('Nominal setoran harus lebih dari Rp 0!', 'error');
+    return;
+  }
+
+  const bank = document.getElementById('uploadBank').value;
+  const tanggal = document.getElementById('uploadTanggal').value || new Date().toISOString().substring(0, 10);
+  const uraian = document.getElementById('uploadUraian').value.trim();
+  const metode = document.getElementById('uploadMetode').value;
+
+  const submitBtn = document.getElementById('btnSubmitUpload');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span> <span>Memeriksa mahram...</span>';
+  }
+
+  const client = getSupabase();
+  if (!client) {
+    showToast('Koneksi Supabase belum siap.', 'error');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
+    }
+    return;
+  }
+
+  // Poin 5: Cek apakah jamaah tersebut ada dalam tabel mahram
+  let mahramGroup = [];
+  const cleanBPIH = String(currentUser?.noBPIH || '').replace(/^0+/, '').trim();
+
+  try {
+    if (cleanBPIH) {
+      const { data: myMahram } = await client
+        .from('mahram')
+        .select('*')
+        .or(`nobpih.eq.${cleanBPIH},nobpih.eq.${currentUser.noBPIH}`);
+
+      if (myMahram && myMahram.length > 0 && myMahram[0].kodemahram) {
+        const { data: group } = await client
+          .from('mahram')
+          .select('*')
+          .eq('kodemahram', myMahram[0].kodemahram);
+        if (group && group.length > 1) {
+          mahramGroup = group;
+        }
+      }
+    }
+
+    if (mahramGroup.length === 0 && currentUser?.namaLengkap) {
+      const { data: myMahramByName } = await client
+        .from('mahram')
+        .select('*')
+        .ilike('nama', `%${currentUser.namaLengkap.trim()}%`);
+
+      if (myMahramByName && myMahramByName.length > 0 && myMahramByName[0].kodemahram) {
+        const { data: group } = await client
+          .from('mahram')
+          .select('*')
+          .eq('kodemahram', myMahramByName[0].kodemahram);
+        if (group && group.length > 1) {
+          mahramGroup = group;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error checking mahram table:', err);
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
+  }
+
+  const payload = {
+    totalAmount: jumlahClean,
+    bank,
+    tanggal,
+    uraian,
+    metode
+  };
+
+  // Jika ditemukan di tabel mahram dan ada lebih dari 1 data: munculkan modal konfirmasi split!
+  if (mahramGroup && mahramGroup.length > 1) {
+    showMahramConfirmModal(payload, mahramGroup);
+  } else {
+    // Single member submit
+    const singleMember = [{
+      nobpih: cleanBPIH,
+      nama: currentUser?.namaLengkap || 'Nasabah',
+      idjamaah: currentUser?.idNasabah || ''
+    }];
+    await executeFinalSubmission(singleMember, jumlahClean, payload);
   }
 }
 

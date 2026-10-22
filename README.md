@@ -11,7 +11,8 @@ Aplikasi web modern, responsif (Desktop & Smartphone) dan terintegrasi langsung 
   1. `data_jamaah_haji`: Menyimpan 82 data profil jamaah haji (No. BPIH, Nama, SPPH, Alamat, Dokumen, Mahram, dsb).
   2. `entry_angsuran_haji`: Menyimpan 439+ riwayat pembayaran angsuran haji, no jurnal, tanggal, bank, status verifikasi (`Approved`, `Pending`, `Cancle`), nominal, dan lampiran bukti transfer.
   3. `users`: Menyimpan 126 akun nasabah dan administrator untuk autentikasi login.
-  4. `running_text`: Pengumuman marquee banner yang berjalan di bagian atas aplikasi.
+  4. `mahram`: Menyimpan 24 relasi mahram jamaah haji (No. BPIH, Nama, Kode Mahram).
+  5. `running_text`: Pengumuman marquee banner yang berjalan di bagian atas aplikasi.
 - **Skrip SQL Supabase**: Tersedia di file [`supabase_schema.sql`](./supabase_schema.sql).
 
 ---
@@ -21,21 +22,20 @@ Aplikasi web modern, responsif (Desktop & Smartphone) dan terintegrasi langsung 
 1. **Autentikasi Multi-User**:
    - Mendukung login menggunakan **Nomor HP** (contoh: `081281866673`), **Nomor BPIH** (contoh: `3000956472`), maupun akun **Administrator** (`admin`).
    - Tombol Quick Fill Demo untuk kemudahan pengujian akun nasabah dan admin.
-2. **Tab 1: Entry Angsuran Haji**:
+2. **Tab 1: Entry Angsuran Haji & Cetak Kwitansi Resmi (Lampiran 1 & 2)**:
    - Ringkasan realtime: **Total Terbayar** (format Rupiah) & **Total Transaksi**.
-   - Pencarian cerdas instan (ID Transaksi, No. Jurnal, Bank, Uraian, Tanggal).
-   - Filter status dinamis: `Approved`, `Pending`, `Cancle`.
-   - Cetak & Lihat **Struk Bukti Pembayaran Resmi** (dilengkapi tombol Cetak / Print).
-3. **Tab 2: Upload Setoran Angsuran**:
-   - Autofill otomatis identitas nasabah yang sedang aktif.
-   - Pilihan rekening bank tujuan & metode pembayaran.
-   - Input nominal dengan auto-formatting Rupiah.
-   - Unggah bukti transfer (JPG, PNG, JPEG) dengan pratinjau (preview) langsung dan validasi ukuran.
-   - Tersimpan langsung ke tabel `entry_angsuran_haji` di Supabase dengan status `Pending`.
+   - Pencarian cerdas instan (ID Transaksi, No. Jurnal, Bank, Uraian, Tanggal) & filter status (`Approved`, `Pending`, `Cancle`).
+   - **Struk Angsuran Haji (Lampiran 2)**: Tampilan detail transaksi, tombol "Lihat Dokumen" ditiadakan, dan tombol **Cetak Kwitansi** hanya aktif apabila status pembayaran **Approved**.
+   - **Cetak Kwitansi Resmi (Lampiran 1)**: Template kuitansi resmi PT. Fath Indah Travel Service lengkap dengan logo, FITS No, Terbilang Rupiah otomatis, kotak nominal Rp & USD, tanggal Bekasi, dan tombol Cetak/Simpan PDF.
+3. **Tab 2: Upload Setoran Angsuran & Fitur Split Mahram (Lampiran 3, 4, 5)**:
+   - Autofill identitas nasabah, pilihan rekening bank, dan metode pembayaran.
+   - **Upload Bukti Transfer Fleksibel (Lampiran 3)**: Mendukung format **Foto/Gambar (JPG, PNG, JPEG)** dan dokumen **PDF** hingga 5 MB dengan pratinjau khusus.
+   - **Perbaikan Rekaman Nominal (Lampiran 4)**: Nominal pembayaran tersimpan sebagai angka utuh (contoh: `Rp 7.000.000` tersimpan akurat sebagai `7000000` di tabel `entry_angsuran_haji`, bukan terpotong menjadi `7`).
+   - **Konfirmasi Split Pembayaran Mahram (Poin 5)**: Saat klik "Kirim Bukti Angsuran", sistem otomatis memeriksa relasi jamaah di tabel `mahram`. Jika terdaftar dalam grup mahram (misal 2 jamaah), pembayaran otomatis dibagi rata (contoh: Rp 3.500.000 masing-masing) dengan checkbox interaktif. Jika salah satu di-uncheck, pembayaran dialokasikan penuh (Rp 7.000.000) ke jamaah yang dipilih.
 4. **Modal Profil Jamaah & Dokumen**:
-   - Klik identitas/logo header untuk melihat profil lengkap jamaah (biodata, umur, alamat, nomor porsi, mahram, estimasi keberangkatan) dan tautan dokumen resmi (BPIH, SPPH, Bukti Transfer).
+   - Foto avatar jamaah dari Google Drive, rincian data lengkap, kartu dokumen per-item, serta fitur **Download List Keuangan Jamaah** (tabel rincian, CSV, cetak PDF).
 5. **Running Text Pengumuman**:
-   - Banner marquee interaktif di bagian atas aplikasi dengan icon pengumuman dan tautan ke kanal media sosial/web Fath Indah.
+   - Banner marquee interaktif dengan kecepatan disesuaikan lebih santai (dikurangi 40%) agar mudah dibaca oleh nasabah dan dapat dijeda saat kursor diarahkan ke teks.
 6. **Desain Mobile-First & Desktop Friendly**:
    - Tampilan responsif dengan estetika islami modern (warna hijau emerald & biru laut Fath Indah, glassmorphism, micro-animations, dan tata letak ramah sentuhan).
 

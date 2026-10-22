@@ -160,29 +160,30 @@ export async function getUserJamaahData(cleanUserNoHP) {
  */
 export async function getAngsuranData(user) {
   try {
-    const userNoHP = normalizeUserNoHP(user?.noHP || user?.username || '');
-    const userNoBPIH = String(user?.noBPIH || '').trim().replace(/^0+/, '');
+    const rawBPIH = String(user?.noBPIH || '').trim();
+    const userNoBPIH = rawBPIH.replace(/^0+/, '');
+    const userRole = String(user?.role || '').toLowerCase();
 
     // Cari semua angsuran
     let query = supabase
       .from('entry_angsuran_haji')
       .select('*')
-      .order('id', { ascending: false });
+      .order('tanggal', { ascending: false });
 
-    // Filter by nohp, nobpih, or user_entry
-    const filterConditions = [];
-    if (userNoHP) {
-      filterConditions.push(`nohp.eq.${userNoHP}`);
-      filterConditions.push(`user_entry.eq.${userNoHP}`);
-    }
-    if (userNoBPIH) {
-      filterConditions.push(`nobpih.eq.${userNoBPIH}`);
-      filterConditions.push(`nobpih.eq.0${userNoBPIH}`);
-      filterConditions.push(`user_entry.eq.${userNoBPIH}`);
-    }
-
-    if (filterConditions.length > 0) {
-      query = query.or(filterConditions.join(','));
+    if (userRole === 'admin') {
+      // Administrator
+    } else if (userNoBPIH) {
+      // Poin 1: Menampilkan data berdasarkan header nobpih dari tabel entry_angsuran_haji
+      const bpihFilters = [
+        `nobpih.eq.${userNoBPIH}`,
+        `nobpih.eq.0${userNoBPIH}`
+      ];
+      if (rawBPIH && rawBPIH !== userNoBPIH) {
+        bpihFilters.push(`nobpih.eq.${rawBPIH}`);
+      }
+      query = query.or(bpihFilters.join(','));
+    } else if (userNoHP) {
+      query = query.eq('nohp', userNoHP);
     }
 
     const { data: rows, error } = await query;
@@ -214,6 +215,13 @@ export async function getAngsuranData(user) {
         createdAt: r.createdat || r.created_at || '-'
       };
     });
+
+    if (userRole !== 'admin' && userNoBPIH) {
+      angsuranList = angsuranList.filter(item => {
+        const itemBPIH = String(item.noBPIH || '').trim().replace(/^0+/, '');
+        return itemBPIH === userNoBPIH;
+      });
+    }
 
     // Hitung total terbayar (hanya Approved)
     let totalTerbayar = 0;

@@ -446,26 +446,29 @@ async function loadAngsuranData() {
   if (client) {
     try {
       const userNoHP = normalizeUserNoHP(currentUser?.noHP || currentUser?.username || '');
-      const userNoBPIH = String(currentUser?.noBPIH || '').trim().replace(/^0+/, '');
+      const rawBPIH = String(currentUser?.noBPIH || '').trim();
+      const userNoBPIH = rawBPIH.replace(/^0+/, '');
+      const userRole = String(currentUser?.role || '').toLowerCase();
 
       let query = client
         .from('entry_angsuran_haji')
         .select('*')
         .order('tanggal', { ascending: false });
 
-      const filterConditions = [];
-      if (userNoHP) {
-        filterConditions.push(`nohp.eq.${userNoHP}`);
-        filterConditions.push(`user_entry.eq.${userNoHP}`);
-      }
-      if (userNoBPIH) {
-        filterConditions.push(`nobpih.eq.${userNoBPIH}`);
-        filterConditions.push(`nobpih.eq.0${userNoBPIH}`);
-        filterConditions.push(`user_entry.eq.${userNoBPIH}`);
-      }
-
-      if (filterConditions.length > 0) {
-        query = query.or(filterConditions.join(','));
+      if (userRole === 'admin') {
+        // Administrator dapat melihat semua data
+      } else if (userNoBPIH) {
+        // Poin 1: Menampilkan data pada lampiran 1 sistem berdasarkan header nobpih dari tabel entry_angsuran_haji
+        const bpihFilters = [
+          `nobpih.eq.${userNoBPIH}`,
+          `nobpih.eq.0${userNoBPIH}`
+        ];
+        if (rawBPIH && rawBPIH !== userNoBPIH) {
+          bpihFilters.push(`nobpih.eq.${rawBPIH}`);
+        }
+        query = query.or(bpihFilters.join(','));
+      } else if (userNoHP) {
+        query = query.eq('nohp', userNoHP);
       }
 
       const { data, error } = await query;
@@ -492,6 +495,14 @@ async function loadAngsuranData() {
             createdAt: r.createdat || r.created_at || '-'
           };
         });
+
+        // Poin 1: Menampilkan data pada lampiran 1 sistem berdasarkan header nobpih dari tabel entry_angsuran_haji
+        if (userRole !== 'admin' && userNoBPIH) {
+          angsuranList = angsuranList.filter(item => {
+            const itemBPIH = String(item.noBPIH || '').trim().replace(/^0+/, '');
+            return itemBPIH === userNoBPIH;
+          });
+        }
 
         // Poin 3: Urutkan kartu berdasarkan tanggal terbaru (descending)
         angsuranList.sort((a, b) => {

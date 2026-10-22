@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+src_reference/
+test_*.py
+test_*.sql
+compare_cols.py
+check_user_sheet.py
+read_sheet*.py
+inspect_sheets.py
+sheet1*.xlsx
+sheet2*.xlsx
+sheet1.html
+sheet2.html

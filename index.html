@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aplikasi Haji Khusus - Fath Indah</title>
+
+  <!-- Remix Icon CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+
+<body>
+
+  <!-- =================================================================== -->
+  <!-- 1. HALAMAN LOGIN                                                    -->
+  <!-- =================================================================== -->
+  <section id="loginSection" class="login-wrapper">
+    <div class="login-card slide-up">
+      <div class="logo-container">
+        <!-- Logo Fath Indah resmi -->
+        <img src="https://lh3.googleusercontent.com/d/1P-mm5_Wx1z1MJ3eBrglcC0pdJ_gAbVCF" 
+             alt="Logo Fath Indah" 
+             class="logo-img"
+             onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1P-mm5_Wx1z1MJ3eBrglcC0pdJ_gAbVCF';">
+        <h1 class="app-title">HAJI KHUSUS</h1>
+        <p class="app-subtitle">Fath Indah Travel Services</p>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="inputUsername">User ID / No. HP / No. BPIH</label>
+          <div class="input-with-icon">
+            <i class="ri-user-line input-icon"></i>
+            <input type="text" id="inputUsername" class="form-input" placeholder="Contoh: 081281866673 / 3000956472" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="inputPassword">Password</label>
+          <div class="input-with-icon">
+            <i class="ri-lock-password-line input-icon"></i>
+            <input type="password" id="inputPassword" class="form-input" placeholder="Masukkan Password" required autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" id="btnLogin" class="btn-primary" style="margin-top:20px;">
+          <span>Masuk Sekarang</span>
+          <i class="ri-arrow-right-line"></i>
+        </button>
+      </form>
+
+      <!-- Quick Demo Login Buttons -->
+      <div class="demo-box">
+        <div class="demo-box-title"><i class="ri-flashlight-line"></i> Akses Cepat Akun Demo</div>
+        <div class="demo-buttons">
+          <button type="button" class="btn-demo" onclick="fillDemoUser('081281866673', '123456')">
+            <i class="ri-user-smile-line"></i> Nasabah (Indrawati)
+          </button>
+          <button type="button" class="btn-demo" onclick="fillDemoUser('admin', 'admin123')">
+            <i class="ri-admin-line"></i> Administrator
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- 2. UTAMA DASHBOARD APP                                             -->
+  <!-- =================================================================== -->
+  <section id="mainAppSection" class="app-container" style="display:none;">
+
+    <!-- Header App -->
+    <header class="app-header">
+      <div class="header-top">
+        <div class="header-brand" onclick="openProfileModal()" title="Buka Detail Profile Jamaah">
+          <img src="https://lh3.googleusercontent.com/d/1MyvGCEnsnt_GhZBRDycxisWDDKbGfMUV" 
+               alt="Logo Fath Indah" 
+               class="header-logo"
+               onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1MyvGCEnsnt_GhZBRDycxisWDDKbGfMUV';">
+          <div class="user-info">
+            <h2 id="displayNamaUser">Nasabah Fath Indah</h2>
+            <p id="displayNoHPUser">No. BPIH: -</p>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="btn-refresh" onclick="handleRefreshData()" title="Segarkan Data">
+            <i class="ri-refresh-line" id="refreshIcon"></i>
+            <span>Refresh</span>
+          </button>
+          <button type="button" class="btn-logout" onclick="handleLogout()" title="Keluar">
+            <i class="ri-logout-box-r-line"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Running Text Marquee -->
+    <div class="running-text-container" id="runningTextContainer" style="display:none;">
+      <div class="running-text-content" id="runningTextContent"></div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button type="button" id="tabBtnEntry" class="tab-btn active" onclick="switchTab('entry')">
+        <i class="ri-history-line"></i>
+        <span>Entry Angsuran Haji</span>
+      </button>
+      <button type="button" id="tabBtnUpload" class="tab-btn" onclick="switchTab('upload')">
+        <i class="ri-upload-cloud-2-line"></i>
+        <span>Upload Angsuran</span>
+      </button>
+    </nav>
+
+    <!-- Area Konten Tab -->
+    <main class="content-area">
+
+      <!-- =============================================================== -->
+      <!-- TAB 1: ENTRY ANGSURAN HAJI (Daftar & Riwayat)                   -->
+      <!-- =============================================================== -->
+      <div id="tabViewEntry">
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+          <div class="card-stat">
+            <div class="card-stat-label">Total Terbayar</div>
+            <div class="card-stat-val primary" id="statTotalTerbayar">Rp 0</div>
+          </div>
+          <div class="card-stat">
+            <div class="card-stat-label">Total Transaksi</div>
+            <div class="card-stat-val" id="statTotalTransaksi">0 Kali</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <i class="ri-search-line search-icon"></i>
+            <input type="text" id="searchInput" class="search-input" placeholder="Cari ID, Bank, Uraian, Tanggal...">
+          </div>
+          <select id="statusFilterSelect" class="form-select form-input-no-icon" style="width:130px; font-size:12px; font-weight:600;">
+            <option value="ALL">Semua Status</option>
+            <option value="Approved">Approved</option>
+            <option value="Pending">Pending</option>
+            <option value="Cancle">Cancle</option>
+          </select>
+        </div>
+
+        <!-- Container List Data Angsuran -->
+        <div id="angsuranDataList"></div>
+
+      </div>
+
+      <!-- =============================================================== -->
+      <!-- TAB 2: UPLOAD ANGSURAN (Form Setoran Baru)                      -->
+      <!-- =============================================================== -->
+      <div id="tabViewUpload" style="display:none;">
+        <div class="upload-card fade-in">
+          <h2 class="form-title">Upload Setoran Angsuran</h2>
+          <p class="form-desc">Kirimkan konfirmasi pembayaran setoran haji Anda di bawah ini.</p>
+
+          <form id="uploadForm">
+
+            <div class="form-group">
+              <label class="form-label">Nama Nasabah</label>
+              <input type="text" id="uploadNamaNasabah" class="form-input form-input-no-icon" readonly style="background:#f1f5f9; color:#64748b;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">No. HP / User ID</label>
+              <input type="text" id="uploadNoHP" class="form-input form-input-no-icon" readonly style="background:#f1f5f9; color:#64748b;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="uploadBank">Bank Tujuan / Rekening</label>
+              <select id="uploadBank" class="form-select form-input-no-icon" required>
+                <option value="Bank Danamon Syariah IDR">Bank Danamon Syariah IDR</option>
+                <option value="Bank Syariah Indonesia (BSI)">Bank Syariah Indonesia (BSI)</option>
+                <option value="Bank Muamalat">Bank Muamalat</option>
+                <option value="Bank Mandiri">Bank Mandiri</option>
+                <option value="Bank BCA">Bank BCA</option>
+                <option value="Bank BNI">Bank BNI</option>
+                <option value="Bank BRI">Bank BRI</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="uploadJumlah">Nominal Pembayaran (Rp)</label>
+              <div class="input-with-icon">
+                <i class="ri-money-dollar-circle-line input-icon"></i>
+                <input type="text" inputmode="numeric" id="uploadJumlah" class="form-input" placeholder="Contoh: Rp 5.000.000" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="uploadTanggal">Tanggal Pembayaran</label>
+              <input type="date" id="uploadTanggal" class="form-input form-input-no-icon" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="uploadMetode">Metode Pembayaran</label>
+              <select id="uploadMetode" class="form-select form-input-no-icon">
+                <option value="Transfer">Transfer Bank</option>
+                <option value="Setoran Tunai">Setoran Tunai Kantor</option>
+                <option value="QRIS / Virtual Account">QRIS / Virtual Account</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="uploadUraian">Keterangan / Uraian Setoran</label>
+              <textarea id="uploadUraian" class="form-textarea form-input-no-icon" rows="3" placeholder="Angsuran Haji Terencana" required>Angsuran Haji Terencana</textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Bukti Transfer (Foto/Gambar)</label>
+              <div class="upload-area" onclick="document.getElementById('fileUploadInput').click()">
+                <i class="ri-upload-2-line upload-icon"></i>
+                <div class="upload-text" id="uploadAreaText">Klik atau seret foto bukti transfer di sini</div>
+                <div class="upload-subtext">Format: JPG, PNG, JPEG (Maksimal 5 MB)</div>
+                <input type="file" id="fileUploadInput" accept="image/*" style="display:none;">
+              </div>
+
+              <!-- Preview foto terpilih -->
+              <div id="previewBox" class="preview-box">
+                <img id="previewImg" src="" alt="Preview Bukti Transfer" class="preview-img">
+                <button type="button" class="btn-remove-preview" onclick="removeSelectedFile()" title="Hapus foto">
+                  <i class="ri-close-line"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" id="btnSubmitUpload" class="btn-primary" style="margin-top:20px;">
+              <i class="ri-send-plane-fill"></i>
+              <span>Kirim Bukti Angsuran</span>
+            </button>
+
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </section>
+
+  <!-- Modal Detail Struk Pembayaran -->
+  <div id="receiptModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title"><i class="ri-file-text-line"></i> Struk Angsuran Haji</span>
+        <button type="button" class="btn-close-modal" onclick="closeReceiptModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalReceiptBody"></div>
+    </div>
+  </div>
+
+  <!-- Modal Profile Jamaah -->
+  <div id="profileModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title"><i class="ri-user-star-line"></i> Profile Jamaah</span>
+        <button type="button" class="btn-close-modal" onclick="closeProfileModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalProfileBody"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Application Entry Script -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

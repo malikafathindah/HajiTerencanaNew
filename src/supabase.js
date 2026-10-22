@@ -321,7 +321,7 @@ export async function getRunningText() {
 
   // Fallback to local running_text.json
   try {
-    const res = await fetch('/running_text.json');
+    const res = await fetch('./running_text.json');
     if (res.ok) {
       return await res.json();
     }

@@ -176,18 +176,20 @@ function formatIndonesianDate(dateStr) {
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
     ];
-    let d = new Date(dateStr);
-    if (isNaN(d.getTime())) {
-      // Try YYYY-MM-DD
-      const parts = String(dateStr).split(/[-/]/);
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        } else if (parts[2].length === 4) {
-          d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    const str = String(dateStr).trim();
+    const datePart = str.split(/[ T]/)[0]; // ambil bagian yyyy-mm-dd
+    const parts = datePart.split(/[-/]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d) && m >= 0 && m < 12) {
+          return `${String(d).padStart(2, '0')} ${months[m]} ${y}`;
         }
       }
     }
+    const d = new Date(dateStr);
     if (!isNaN(d.getTime())) {
       const day = String(d.getDate()).padStart(2, '0');
       const month = months[d.getMonth()];
@@ -449,7 +451,7 @@ async function loadAngsuranData() {
       let query = client
         .from('entry_angsuran_haji')
         .select('*')
-        .order('id_1', { ascending: false });
+        .order('tanggal', { ascending: false });
 
       const filterConditions = [];
       if (userNoHP) {
@@ -489,6 +491,16 @@ async function loadAngsuranData() {
             linkDokumen: r.linkdokumen || '',
             createdAt: r.createdat || r.created_at || '-'
           };
+        });
+
+        // Poin 3: Urutkan kartu berdasarkan tanggal terbaru (descending)
+        angsuranList.sort((a, b) => {
+          const dateStrA = String(a.tanggal || a.createdAt || '').trim();
+          const dateStrB = String(b.tanggal || b.createdAt || '').trim();
+          if (dateStrB !== dateStrA) {
+            return dateStrB.localeCompare(dateStrA);
+          }
+          return String(b.id).localeCompare(String(a.id));
         });
       }
     } catch (e) {
@@ -567,7 +579,7 @@ function renderAngsuranList() {
         <div class="card-nominal">${formatRupiah(item.jumlah)}</div>
         <div class="card-uraian">${escapeHtml(item.uraian)}</div>
         <div class="card-footer-info">
-          <span><i class="ri-bank-line"></i> ${escapeHtml(item.bank)} &bull; ${escapeHtml(item.tanggal)}</span>
+          <span><i class="ri-bank-line"></i> ${escapeHtml(item.bank)} &bull; ${escapeHtml(item.tanggal ? item.tanggal.substring(0, 10) : '-')}</span>
           <button type="button" class="btn-view-struk" onclick="event.stopPropagation(); openReceiptModal(${idx});">
             <i class="ri-file-text-line"></i> Struk
           </button>
@@ -679,13 +691,17 @@ window.openReceiptModal = function (idx) {
         <span class="receipt-total-val">${formatRupiah(item.jumlah)}</span>
       </div>
 
-      <!-- Sesuai Poin 1 & Lampiran 2: 'Lihat Dokumen' Dihilangkan, hanya 'Cetak Kwitansi' (aktif jika Approved) -->
-      <div class="receipt-actions" style="margin-top: 18px;">
+      <!-- Poin 1: Ditambahkan tombol 'Lihat Bukti Transfer' (diambil dari linkdokumen) dan 'Cetak Kwitansi' (aktif jika Approved) -->
+      <div class="receipt-dual-actions" style="margin-top: 18px; display: flex; gap: 10px;">
+        <button type="button" class="btn-action-doc" onclick="viewReceiptDoc(${idx})" 
+                style="flex: 1; padding: 11px; background: #0284c7; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+          <i class="ri-file-search-line"></i> Lihat Bukti Transfer
+        </button>
         <button type="button" class="btn-action-print ${!isApproved ? 'btn-disabled' : ''}" 
                 ${!isApproved ? 'disabled' : ''} 
                 onclick="printOfficialKuitansi(${idx})"
                 title="${isApproved ? 'Cetak Kwitansi Resmi' : 'Cetak Kwitansi hanya tersedia apabila status Approved'}"
-                style="width: 100%; justify-content: center; ${!isApproved ? 'opacity: 0.5; cursor: not-allowed; background: #64748b;' : ''}">
+                style="flex: 1; padding: 11px; justify-content: center; ${!isApproved ? 'opacity: 0.5; cursor: not-allowed; background: #64748b;' : ''}">
           <i class="ri-printer-line"></i> Cetak Kwitansi
         </button>
       </div>
@@ -698,6 +714,27 @@ window.openReceiptModal = function (idx) {
 window.closeReceiptModal = function () {
   const modal = document.getElementById('receiptModal');
   if (modal) modal.style.display = 'none';
+};
+
+/**
+ * Poin 1: Lihat bukti transfer yang diambil dari tabel entry_angsuran_haji header linkdokumen
+ */
+window.viewReceiptDoc = function (idx) {
+  const item = (idx !== undefined && filteredAngsuranList[idx]) ? filteredAngsuranList[idx] : currentReceiptItem;
+  if (!item) return;
+
+  const docUrl = item.linkDokumen;
+  if (docUrl) {
+    viewDocumentViewer('Bukti Transfer - ' + (item.noJurnal || item.id), docUrl);
+  } else {
+    // Fallback jika belum memiliki linkdokumen langsung
+    const jamaahTransfer = currentUser?.detail?.buktitransfer;
+    if (jamaahTransfer) {
+      viewDocumentViewer('Bukti Transfer Setoran - ' + (item.noJurnal || item.id), jamaahTransfer);
+    } else {
+      showToast('Belum ada berkas bukti transfer untuk transaksi ini.', 'info');
+    }
+  }
 };
 
 /**
@@ -1174,28 +1211,61 @@ function viewDocumentViewer(title, url) {
 
   if (titleEl) titleEl.innerHTML = `<i class="ri-file-search-line"></i> ${escapeHtml(title)}`;
 
-  const cdnUrl = formatDriveFileUrl(url);
-  const viewUrl = getDriveViewUrl(url);
+  const isDataUrl = String(url).startsWith('data:');
+  const isPdf = isDataUrl 
+    ? String(url).startsWith('data:application/pdf') 
+    : String(url).toLowerCase().includes('.pdf');
 
-  bodyEl.innerHTML = `
-    <div style="text-align:center; padding:10px;">
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:14px;">
-        <img src="${cdnUrl}" 
-             alt="${escapeHtml(title)}" 
-             style="max-width:100%; max-height:450px; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);"
-             onerror="this.style.display='none'; document.getElementById('docFallbackText').style.display='block';">
-        <div id="docFallbackText" style="display:none; padding:20px; color:#64748b;">
-          <i class="ri-file-pdf-line" style="font-size:48px; color:#ef4444;"></i>
-          <p style="margin-top:8px; font-weight:600;">Berkas dokumen dalam format PDF atau Google Drive.</p>
-        </div>
+  if (isDataUrl && isPdf) {
+    bodyEl.innerHTML = `
+      <div style="height: 72vh; overflow: hidden; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1;">
+        <iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>
       </div>
-      <div style="display:flex; gap:10px; justify-content:center;">
-        <a href="${viewUrl}" target="_blank" class="btn-sheet-csv" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-          <i class="ri-external-link-line"></i> Buka di Google Drive
+      <div style="text-align: center; margin-top: 14px;">
+        <a href="${url}" download="${escapeHtml(title)}.pdf" class="btn-sheet-csv" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+          <i class="ri-download-2-line"></i> Unduh Berkas PDF
         </a>
       </div>
-    </div>
-  `;
+    `;
+  } else if (isDataUrl && !isPdf) {
+    bodyEl.innerHTML = `
+      <div style="text-align:center; padding:10px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:14px;">
+          <img src="${url}" 
+               alt="${escapeHtml(title)}" 
+               style="max-width:100%; max-height:480px; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <a href="${url}" download="${escapeHtml(title)}.jpg" class="btn-sheet-csv" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            <i class="ri-download-2-line"></i> Unduh Foto Bukti
+          </a>
+        </div>
+      </div>
+    `;
+  } else {
+    const cdnUrl = formatDriveFileUrl(url);
+    const viewUrl = getDriveViewUrl(url);
+
+    bodyEl.innerHTML = `
+      <div style="text-align:center; padding:10px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:14px;">
+          <img src="${cdnUrl}" 
+               alt="${escapeHtml(title)}" 
+               style="max-width:100%; max-height:450px; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);"
+               onerror="this.style.display='none'; document.getElementById('docFallbackText').style.display='block';">
+          <div id="docFallbackText" style="display:none; padding:20px; color:#64748b;">
+            <i class="ri-file-pdf-line" style="font-size:48px; color:#ef4444;"></i>
+            <p style="margin-top:8px; font-weight:600;">Berkas dokumen dalam format PDF atau Google Drive.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <a href="${viewUrl}" target="_blank" class="btn-sheet-csv" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            <i class="ri-external-link-line"></i> Buka Dokumen
+          </a>
+        </div>
+      </div>
+    `;
+  }
 
   modal.style.display = 'flex';
 }
@@ -1516,7 +1586,18 @@ async function executeFinalSubmission(members, splitAmount, payload) {
 
   const now = new Date();
   const currentYear = now.getFullYear();
-  const formattedNow = now.toISOString().replace('T', ' ').substring(0, 19);
+  const pad = (n) => String(n).padStart(2, '0');
+  const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const currentDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const formattedNow = `${currentDate} ${currentTime}`;
+
+  // Sesuai Poin 2: khusus perekaman pada tabel entry_angsuran_haji menggunakan format yyyy-mm-dd hh:mm:ss
+  let recordedTanggal = String(payload.tanggal || '').trim();
+  if (!recordedTanggal) {
+    recordedTanggal = formattedNow;
+  } else if (recordedTanggal.length === 10) {
+    recordedTanggal = `${recordedTanggal} ${currentTime}`;
+  }
 
   const records = members.map((m, idx) => {
     const random4 = Math.floor(1000 + Math.random() * 9000);
@@ -1542,7 +1623,7 @@ async function executeFinalSubmission(members, splitAmount, payload) {
       jumlah: String(splitAmount), // Memastikan nominal angka utuh direkam (bukan 7)
       nilaikurs: '0',
       user_entry: currentUser?.noHP || currentUser?.username || '',
-      tanggal: payload.tanggal || formattedNow.substring(0, 10),
+      tanggal: recordedTanggal, // Sesuai Poin 2: format yyyy-mm-dd hh:mm:ss
       metodepembayaran: payload.metode,
       status: 'Pending',
       createdat: formattedNow,

@@ -1679,6 +1679,42 @@ body {
     </div>
   </div>
 
+  <!-- Modal Windows Pesan Bukti Transfer Belum Di-Upload -->
+  <div id="noDocModal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 440px; text-align: center; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.25); border: 1px solid #fed7aa;">
+      <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 30px 24px 20px 24px; position: relative; border-bottom: 1px solid #fde68a;">
+        <button type="button" class="btn-close-modal" onclick="closeNoDocModal()" style="position: absolute; top: 12px; right: 14px; font-size: 24px; color: #92400e; background: none; border: none; cursor: pointer;">&times;</button>
+        <div style="width: 72px; height: 72px; background: #ffffff; border: 2.5px dashed #f59e0b; border-radius: 50%; margin: 0 auto 14px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2);">
+          <i class="ri-file-warning-line" style="font-size: 38px; color: #d97706;"></i>
+        </div>
+        <h3 style="font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; color: #92400e; margin-bottom: 4px;">
+          Bukti Transfer Belum Di-Upload
+        </h3>
+        <p style="font-size: 13px; color: #b45309; font-weight: 600;" id="noDocSubtitle">
+          Transaksi Haji Terencana
+        </p>
+      </div>
+
+      <div style="padding: 22px 24px; background: #ffffff;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 20px; text-align: left; font-size: 13px; color: #475569; line-height: 1.6;">
+          <div style="display: flex; gap: 10px; align-items: flex-start;">
+            <i class="ri-information-line" style="font-size: 20px; color: #0284c7; flex-shrink: 0; margin-top: 1px;"></i>
+            <span>Berkas bukti transfer untuk setoran ini <strong>belum di-upload</strong> atau tidak ditemukan dalam sistem database kami. Anda dapat mengunggah berkas bukti transfer baru melalui menu Form Upload Setoran.</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" onclick="closeNoDocModal()" style="flex: 1; padding: 11px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;">
+            Tutup
+          </button>
+          <button type="button" onclick="goToUploadTabFromNoDoc()" style="flex: 1; padding: 11px 16px; background: #0f766e; color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25); transition: all 0.2s;">
+            <i class="ri-upload-cloud-line"></i> Upload Bukti
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 

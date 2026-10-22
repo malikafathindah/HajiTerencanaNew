@@ -718,23 +718,51 @@ window.closeReceiptModal = function () {
 
 /**
  * Poin 1: Lihat bukti transfer yang diambil dari tabel entry_angsuran_haji header linkdokumen
+ * Jika linkdokumen tidak ada, bernilai NULL, kosong, atau tidak terbaca -> muncul windows pesan bukti transfer belum di Upload
  */
 window.viewReceiptDoc = function (idx) {
   const item = (idx !== undefined && filteredAngsuranList[idx]) ? filteredAngsuranList[idx] : currentReceiptItem;
   if (!item) return;
 
-  const docUrl = item.linkDokumen;
-  if (docUrl) {
-    viewDocumentViewer('Bukti Transfer - ' + (item.noJurnal || item.id), docUrl);
-  } else {
-    // Fallback jika belum memiliki linkdokumen langsung
-    const jamaahTransfer = currentUser?.detail?.buktitransfer;
-    if (jamaahTransfer) {
-      viewDocumentViewer('Bukti Transfer Setoran - ' + (item.noJurnal || item.id), jamaahTransfer);
-    } else {
-      showToast('Belum ada berkas bukti transfer untuk transaksi ini.', 'info');
-    }
+  const rawDoc = String(item.linkDokumen || '').trim();
+  const isInvalid = !rawDoc || 
+                    rawDoc.toLowerCase() === 'null' || 
+                    rawDoc.toLowerCase() === 'undefined' || 
+                    rawDoc.toLowerCase() === 'none' ||
+                    rawDoc === '-' || 
+                    rawDoc.length < 5;
+
+  if (isInvalid) {
+    openNoDocModal(item);
+    return;
   }
+
+  viewDocumentViewer('Bukti Transfer - ' + (item.noJurnal || item.id), rawDoc);
+};
+
+window.openNoDocModal = function (item) {
+  const modal = document.getElementById('noDocModal');
+  const subEl = document.getElementById('noDocSubtitle');
+  if (!modal) return;
+
+  if (subEl && item) {
+    const jrn = item.noJurnal || item.id || '-';
+    const tgl = item.tanggal ? formatIndonesianDate(item.tanggal) : '';
+    subEl.textContent = `${jrn} ${tgl ? '• ' + tgl : ''}`;
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.closeNoDocModal = function () {
+  const modal = document.getElementById('noDocModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.goToUploadTabFromNoDoc = function () {
+  closeNoDocModal();
+  closeReceiptModal();
+  switchTab('upload');
 };
 
 /**
